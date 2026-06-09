@@ -1,0 +1,95 @@
+version: '3.9'
+
+networks:
+  frontend:
+  backend:
+
+services:
+
+  db:
+    image: postgres:15-alpine
+    container_name: auditbot_db
+    restart: unless-stopped
+    networks: [backend]          # NOT exposed to host
+    environment:
+      POSTGRES_USER: auditbot_app
+      POSTGRES_PASSWORD_FILE: /run/secrets/db_password
+      POSTGRES_DB: auditbot_prod
+    secrets: [db_password]
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U auditbot_app"]
+      interval: 10s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: auditbot_redis
+    restart: unless-stopped
+    networks: [backend]
+    command: redis-server --maxmemory 256mb --maxmemory-policy allkeys-lru
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+
+  migrate:
+    build: .
+    command: alembic upgrade head
+    networks: [backend]
+    env_file: .env
+    depends_on:
+      db: {condition: service_healthy}
+    restart: "no"
+
+  web:
+    build: .
+    container_name: auditbot_api
+    restart: unless-stopped
+    networks: [frontend, backend]
+    env_file: .env
+    depends_on:
+      db:     {condition: service_healthy}
+      redis:  {condition: service_healthy}
+      migrate: {condition: service_completed_successfully}
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  celery_worker:
+    build: .
+    command: celery -A app.celery_app worker -Q documents --concurrency=4 -l info
+    restart: unless-stopped
+    networks: [backend]
+    env_file: .env
+    depends_on:
+      db:    {condition: service_healthy}
+      redis: {condition: service_healthy}
+
+  flower:
+    image: mher/flower:2.0
+    container_name: auditbot_flower
+    networks: [backend]
+    environment:
+      - CELERY_BROKER_URL=redis://redis:6379/0
+    ports: ["5555:5555"]         # restrict to VPN in production
+    depends_on: [redis]
+
+  nginx:
+    image: nginx:1.25-alpine
+    container_name: auditbot_nginx
+    restart: unless-stopped
+    networks: [frontend]
+    ports: ["8080:80"]           # change to 443 + TLS in production
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on: [web]
+
+volumes:
+  postgres_data:
+
+secrets:
+  db_password:
+    file: ./secrets/db_password.txt   # create this file locally, never commit it
