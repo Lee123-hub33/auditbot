@@ -3,7 +3,7 @@ from pydantic import field_validator, SecretStr
 from typing import FrozenSet, List
 from pathlib import Path
 
-# Move BASE_DIR outside the class so Pydantic ignores it
+# BASE_DIR is outside the class, so Pydantic ignores it as a field
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 class Settings(BaseSettings):
