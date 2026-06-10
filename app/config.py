@@ -4,8 +4,11 @@ from typing import FrozenSet, List
 from pathlib import Path
 
 class Settings(BaseSettings):
+    # Calculate absolute path to root directory (one level up from app/)
+    BASE_DIR = Path(__file__).resolve().parent.parent
+    
     model_config = SettingsConfigDict(
-        env_file=(".env.test", ".env"),
+        env_file=(str(BASE_DIR / ".env.test"), str(BASE_DIR / ".env")),
         env_file_encoding="utf-8",
         case_sensitive=True,
     )
