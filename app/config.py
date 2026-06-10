@@ -1,16 +1,16 @@
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from pydantic import field_validator, SecretStr
-from typing import FrozenSet, List
+from typing import FrozenSet, List, ClassVar
 from pathlib import Path
 
 class Settings(BaseSettings):
-    # Calculate absolute path to root directory (one level up from app/)
-    BASE_DIR = Path(__file__).resolve().parent.parent
+    BASE_DIR: ClassVar[Path] = Path(__file__).resolve().parent.parent
     
     model_config = SettingsConfigDict(
         env_file=(str(BASE_DIR / ".env.test"), str(BASE_DIR / ".env")),
         env_file_encoding="utf-8",
         case_sensitive=True,
+        extra="ignore"
     )
 
     DATABASE_URL: SecretStr
