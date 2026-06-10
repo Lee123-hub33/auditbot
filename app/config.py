@@ -1,11 +1,12 @@
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from pydantic import field_validator, SecretStr
-from typing import FrozenSet, List, ClassVar
+from typing import FrozenSet, List
 from pathlib import Path
 
+# Move BASE_DIR outside the class so Pydantic ignores it
+BASE_DIR = Path(__file__).resolve().parent.parent
+
 class Settings(BaseSettings):
-    BASE_DIR: ClassVar[Path] = Path(__file__).resolve().parent.parent
-    
     model_config = SettingsConfigDict(
         env_file=(str(BASE_DIR / ".env.test"), str(BASE_DIR / ".env")),
         env_file_encoding="utf-8",
@@ -52,6 +53,5 @@ class Settings(BaseSettings):
     @property
     def is_production(self) -> bool:
         return self.ENVIRONMENT == "production"
-
 
 settings = Settings()
