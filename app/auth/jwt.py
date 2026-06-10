@@ -1,6 +1,5 @@
 # app/auth/jwt.py
 from datetime import datetime, timedelta, timezone
-from typing import Optional
 import jwt
 import hashlib
 import secrets
@@ -19,7 +18,8 @@ def create_access_token(user_id: str, email: str, role: str) -> str:
         "role": role,
         "type": "access",
         "iat": datetime.now(timezone.utc),
-        "exp": datetime.now(timezone.utc) + timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES),
+        "exp": datetime.now(timezone.utc)
+        + timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES),
     }
     return jwt.encode(payload, settings.jwt_private_key, algorithm="RS256")
 

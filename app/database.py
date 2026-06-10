@@ -7,8 +7,8 @@ engine = create_async_engine(
     settings.DATABASE_URL.get_secret_value(),
     pool_size=20,
     max_overflow=10,
-    pool_pre_ping=True,          # drops stale connections automatically
-    pool_recycle=3600,           # recycle connections every hour
+    pool_pre_ping=True,  # drops stale connections automatically
+    pool_recycle=3600,  # recycle connections every hour
     echo=not settings.is_production,  # log SQL in dev only
 )
 

@@ -68,6 +68,7 @@ class DocumentResponse(BaseModel):
 
     model_config = {"from_attributes": True, "populate_by_name": True}
 
+
 class DocumentStatusResponse(BaseModel):
     document_id: UUID4
     status: ProcessStatus

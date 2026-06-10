@@ -6,7 +6,13 @@ from sqlalchemy.future import select
 from passlib.context import CryptContext
 from app.database import get_db
 from app.models import User, RefreshToken, UserRole
-from app.schemas import UserRegister, UserLogin, TokenResponse, RefreshRequest, UserResponse
+from app.schemas import (
+    UserRegister,
+    UserLogin,
+    TokenResponse,
+    RefreshRequest,
+    UserResponse,
+)
 from app.auth.jwt import create_access_token, create_refresh_token, hash_token
 from app.auth.rbac import require_admin
 from app.auth.jwt import get_current_user
@@ -26,7 +32,9 @@ def hash_password(plain: str) -> str:
     return pwd_context.hash(plain)
 
 
-@router.post("/register", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/register", response_model=UserResponse, status_code=status.HTTP_201_CREATED
+)
 async def register(body: UserRegister, db: AsyncSession = Depends(get_db)):
     """Register a new user. Default role: UPLOADER."""
     # Check email not already taken
@@ -73,7 +81,8 @@ async def login(body: UserLogin, request: Request, db: AsyncSession = Depends(ge
     refresh_entry = RefreshToken(
         user_id=user.id,
         token_hash=hashed_refresh,
-        expires_at=datetime.now(timezone.utc) + timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS),
+        expires_at=datetime.now(timezone.utc)
+        + timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS),
         ip_address=request.client.host,
     )
     db.add(refresh_entry)
@@ -122,7 +131,8 @@ async def refresh_tokens(body: RefreshRequest, db: AsyncSession = Depends(get_db
     new_refresh = RefreshToken(
         user_id=user.id,
         token_hash=hashed_refresh,
-        expires_at=datetime.now(timezone.utc) + timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS),
+        expires_at=datetime.now(timezone.utc)
+        + timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS),
     )
     db.add(new_refresh)
     await db.commit()
@@ -148,7 +158,9 @@ async def logout(body: RefreshRequest, db: AsyncSession = Depends(get_db)):
 
 
 @router.get("/me", response_model=UserResponse)
-async def get_me(current_user: dict = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+async def get_me(
+    current_user: dict = Depends(get_current_user), db: AsyncSession = Depends(get_db)
+):
     """Return the currently authenticated user's profile."""
     result = await db.execute(select(User).where(User.id == current_user["sub"]))
     user = result.scalar_one_or_none()

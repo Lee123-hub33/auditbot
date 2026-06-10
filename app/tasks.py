@@ -1,4 +1,3 @@
-# app/tasks.py
 import asyncio
 import structlog
 from sqlalchemy.future import select
@@ -8,6 +7,7 @@ from app.models import Document, AuditLog, ProcessStatus
 from app.config import settings
 from app.utils.document_parser import extract_text
 from app.utils.audit_engine import run_all_rules
+from pathlib import Path
 
 log = structlog.get_logger()
 
@@ -41,34 +41,34 @@ async def _run_pipeline(document_id: str):
             return
 
         if doc.status not in (ProcessStatus.PENDING, ProcessStatus.FAILED):
-            log.info("document_already_processed", document_id=document_id, status=doc.status)
+            log.info(
+                "document_already_processed", document_id=document_id, status=doc.status
+            )
             return
 
-        # Mark as processing
         doc.status = ProcessStatus.PROCESSING
         doc.error_message = None
         await db.commit()
         log.info("pipeline_processing", document_id=document_id)
 
         try:
-            # Read file
-            with open(doc.file_path, "rb") as f:
+            file_path = Path(doc.file_path)
+            with open(file_path, "rb") as f:
                 content = f.read()
 
-            # Extract text
             text = extract_text(content, doc.mime_type, doc.filename)
             if not text.strip():
                 text = "Document appears to be empty or unreadable."
             log.info("text_extracted", document_id=document_id, chars=len(text))
 
-            # Run audit rules
             audit_results = run_all_rules(
                 text=text,
                 gemini_api_key=settings.GEMINI_API_KEY.get_secret_value(),
             )
-            log.info("rules_evaluated", document_id=document_id, count=len(audit_results))
+            log.info(
+                "rules_evaluated", document_id=document_id, count=len(audit_results)
+            )
 
-            # Save results
             for r in audit_results:
                 log_entry = AuditLog(
                     document_id=doc.id,
@@ -81,7 +81,9 @@ async def _run_pipeline(document_id: str):
 
             doc.status = ProcessStatus.COMPLETED
             await db.commit()
-            log.info("pipeline_complete", document_id=document_id, rules=len(audit_results))
+            log.info(
+                "pipeline_complete", document_id=document_id, rules=len(audit_results)
+            )
 
         except Exception as e:
             doc.status = ProcessStatus.FAILED

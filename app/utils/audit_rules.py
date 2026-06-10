@@ -7,24 +7,24 @@ Rules are evaluated by the AI pipeline in tasks.py.
 Adding a new rule: create a new AuditRule entry in AUDIT_RULES.
 No other code changes needed — the pipeline iterates all rules automatically.
 """
+
 from dataclasses import dataclass
 
 
 @dataclass(frozen=True)
 class AuditRule:
-    rule_id: str          # e.g. "GDPR-001"
-    name: str             # human-readable label
-    description: str      # what this rule checks
+    rule_id: str  # e.g. "GDPR-001"
+    name: str  # human-readable label
+    description: str  # what this rule checks
     prompt_instruction: str  # injected into the AI prompt
-    severity: int         # 0=info 1=low 2=medium 3=high 4=critical
-    category: str         # grouping label for reports
+    severity: int  # 0=info 1=low 2=medium 3=high 4=critical
+    category: str  # grouping label for reports
 
 
 # ── Rule definitions ──────────────────────────────────────────────────────────
 # Extend this list freely. Each rule produces one AuditLog entry per document.
 
 AUDIT_RULES: list[AuditRule] = [
-
     # ── GDPR / Privacy ────────────────────────────────────────────────────────
     AuditRule(
         rule_id="PRIVACY-001",
@@ -49,7 +49,6 @@ AUDIT_RULES: list[AuditRule] = [
         severity=2,
         category="Privacy",
     ),
-
     # ── Security ──────────────────────────────────────────────────────────────
     AuditRule(
         rule_id="SEC-001",
@@ -75,7 +74,6 @@ AUDIT_RULES: list[AuditRule] = [
         severity=3,
         category="Security",
     ),
-
     # ── Compliance ────────────────────────────────────────────────────────────
     AuditRule(
         rule_id="COMP-001",
@@ -101,7 +99,6 @@ AUDIT_RULES: list[AuditRule] = [
         severity=4,
         category="Compliance",
     ),
-
     # ── Content Quality ───────────────────────────────────────────────────────
     AuditRule(
         rule_id="QUAL-001",

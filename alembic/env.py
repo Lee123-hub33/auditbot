@@ -8,10 +8,7 @@ from app.config import settings
 config = context.config
 fileConfig(config.config_file_name)
 
-config.set_main_option(
-    "sqlalchemy.url",
-    settings.DATABASE_URL_SYNC.get_secret_value()
-)
+config.set_main_option("sqlalchemy.url", settings.DATABASE_URL_SYNC.get_secret_value())
 
 target_metadata = Base.metadata
 

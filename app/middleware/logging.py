@@ -13,6 +13,7 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
     Injects a correlation ID into every request.
     Logs method, path, status, and duration for every request.
     """
+
     async def dispatch(self, request: Request, call_next):
         req_id = request.headers.get("X-Request-ID", str(uuid.uuid4()))
         structlog.contextvars.clear_contextvars()

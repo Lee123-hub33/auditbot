@@ -3,6 +3,7 @@
 Extracts plain text from uploaded documents.
 Supports: PDF (via pdfplumber), TXT.
 """
+
 import io
 import structlog
 
@@ -19,13 +20,16 @@ def extract_text(content: bytes, mime_type: str, filename: str) -> str:
     elif mime_type == "text/plain":
         return _extract_txt(content, filename)
     else:
-        log.warning("unsupported_mime_for_extraction", mime=mime_type, filename=filename)
+        log.warning(
+            "unsupported_mime_for_extraction", mime=mime_type, filename=filename
+        )
         return ""
 
 
 def _extract_pdf(content: bytes, filename: str) -> str:
     try:
         import pdfplumber
+
         text_parts = []
         with pdfplumber.open(io.BytesIO(content)) as pdf:
             for i, page in enumerate(pdf.pages):
@@ -33,7 +37,12 @@ def _extract_pdf(content: bytes, filename: str) -> str:
                 if page_text:
                     text_parts.append(f"[Page {i+1}]\n{page_text}")
         full_text = "\n\n".join(text_parts)
-        log.info("pdf_extracted", filename=filename, pages=len(text_parts), chars=len(full_text))
+        log.info(
+            "pdf_extracted",
+            filename=filename,
+            pages=len(text_parts),
+            chars=len(full_text),
+        )
         return full_text
     except Exception as e:
         log.error("pdf_extraction_failed", filename=filename, error=str(e))

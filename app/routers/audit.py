@@ -13,8 +13,11 @@ from typing import Optional
 router = APIRouter(prefix="/api/v1/audit", tags=["Audit"])
 
 
-@router.get("/{document_id}/report", response_model=AuditReportResponse,
-            dependencies=[Depends(require_reviewer)])
+@router.get(
+    "/{document_id}/report",
+    response_model=AuditReportResponse,
+    dependencies=[Depends(require_reviewer)],
+)
 async def get_audit_report(
     document_id: UUID,
     db: AsyncSession = Depends(get_db),
@@ -47,9 +50,9 @@ async def get_audit_report(
     logs = logs_result.scalars().all()
 
     # Build summary counts
-    passed     = sum(1 for l in logs if l.result == AuditResult.PASSED)
-    violations = sum(1 for l in logs if l.result == AuditResult.VIOLATION)
-    warnings   = sum(1 for l in logs if l.result == AuditResult.WARNING)
+    passed = sum(1 for log in logs if log.result == AuditResult.PASSED)
+    violations = sum(1 for log in logs if log.result == AuditResult.VIOLATION)
+    warnings = sum(1 for log in logs if log.result == AuditResult.WARNING)
 
     return AuditReportResponse(
         document_id=doc.id,
@@ -63,8 +66,11 @@ async def get_audit_report(
     )
 
 
-@router.get("/{document_id}/logs", response_model=list[AuditLogResponse],
-            dependencies=[Depends(require_reviewer)])
+@router.get(
+    "/{document_id}/logs",
+    response_model=list[AuditLogResponse],
+    dependencies=[Depends(require_reviewer)],
+)
 async def get_audit_logs(
     document_id: UUID,
     result_filter: Optional[AuditResult] = None,

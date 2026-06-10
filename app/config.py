@@ -1,8 +1,7 @@
-# app/config.py
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from pydantic import field_validator, SecretStr
 from typing import FrozenSet, List
-import os
+from pathlib import Path  # 1. Import Path
 
 
 class Settings(BaseSettings):
@@ -12,29 +11,25 @@ class Settings(BaseSettings):
         case_sensitive=True,
     )
 
-    # --- Database ---
+    # ... (Database, Redis stay the same) ...
     DATABASE_URL: SecretStr
-    DATABASE_URL_SYNC: SecretStr = None  # used by Alembic only
-
-    # --- Redis ---
+    DATABASE_URL_SYNC: SecretStr = None
     REDIS_URL: SecretStr
 
-    # --- Auth ---
-    JWT_PRIVATE_KEY_PATH: str = "./secrets/jwt_private.pem"
-    JWT_PUBLIC_KEY_PATH: str = "./secrets/jwt_public.pem"
+    # 2. Update these to Path objects
+    JWT_PRIVATE_KEY_PATH: Path = Path("./secrets/jwt_private.pem")
+    JWT_PUBLIC_KEY_PATH: Path = Path("./secrets/jwt_public.pem")
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 15
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
-    SECRET_KEY: SecretStr  # for signing refresh tokens (HMAC fallback)
+    SECRET_KEY: SecretStr
 
-    # --- File Upload ---
-    STORAGE_DIR: str = "./storage"
+    # 2. Update this to a Path object
+    STORAGE_DIR: Path = Path("./storage")
     ALLOWED_EXTENSIONS: FrozenSet[str] = frozenset({"pdf", "txt"})
-    MAX_FILE_SIZE_BYTES: int = 15 * 1024 * 1024  # 15 MB
+    MAX_FILE_SIZE_BYTES: int = 15 * 1024 * 1024
 
-    # --- AI ---
+    # ... (AI, App stay the same) ...
     GEMINI_API_KEY: SecretStr
-
-    # --- App ---
     ENVIRONMENT: str = "development"
     ALLOWED_ORIGINS: List[str] = ["http://localhost:3000"]
 
@@ -46,14 +41,15 @@ class Settings(BaseSettings):
             raise ValueError("DATABASE_URL must be PostgreSQL")
         return v
 
+    # 3. Use newline="" and open the Path object
     @property
     def jwt_private_key(self) -> str:
-        with open(self.JWT_PRIVATE_KEY_PATH, "r") as f:
+        with open(self.JWT_PRIVATE_KEY_PATH, "r", encoding="utf-8") as f:
             return f.read()
 
     @property
     def jwt_public_key(self) -> str:
-        with open(self.JWT_PUBLIC_KEY_PATH, "r") as f:
+        with open(self.JWT_PUBLIC_KEY_PATH, "r", encoding="utf-8") as f:
             return f.read()
 
     @property

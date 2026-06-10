@@ -24,8 +24,12 @@ router = APIRouter(prefix="/api/v1/documents", tags=["Documents"])
 limiter = Limiter(key_func=get_remote_address)
 
 
-@router.post("/upload", response_model=DocumentResponse, status_code=status.HTTP_201_CREATED,
-             dependencies=[Depends(require_uploader)])
+@router.post(
+    "/upload",
+    response_model=DocumentResponse,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(require_uploader)],
+)
 @limiter.limit("10/minute")
 async def upload_document(
     request: Request,
@@ -38,7 +42,9 @@ async def upload_document(
     # Check for duplicate
     existing = await db.execute(select(Document).where(Document.sha256 == sha256))
     if existing.scalar_one_or_none():
-        raise HTTPException(status_code=409, detail="Document already uploaded (duplicate detected)")
+        raise HTTPException(
+            status_code=409, detail="Document already uploaded (duplicate detected)"
+        )
 
     # Safe storage path
     token = secrets.token_hex(32)
@@ -74,13 +80,20 @@ async def upload_document(
         countdown=1,
     )
 
-    log.info("document_uploaded", document_id=str(db_doc.id),
-             filename=db_doc.filename, user=current_user["sub"])
+    log.info(
+        "document_uploaded",
+        document_id=str(db_doc.id),
+        filename=db_doc.filename,
+        user=current_user["sub"],
+    )
     return db_doc
 
 
-@router.get("/{document_id}/status", response_model=DocumentStatusResponse,
-            dependencies=[Depends(require_viewer)])
+@router.get(
+    "/{document_id}/status",
+    response_model=DocumentStatusResponse,
+    dependencies=[Depends(require_viewer)],
+)
 async def get_document_status(document_id: UUID, db: AsyncSession = Depends(get_db)):
     result = await db.execute(
         select(Document).where(Document.id == document_id, Document.deleted_at == None)
@@ -91,7 +104,9 @@ async def get_document_status(document_id: UUID, db: AsyncSession = Depends(get_
     return doc
 
 
-@router.get("", response_model=PaginatedDocuments, dependencies=[Depends(require_viewer)])
+@router.get(
+    "", response_model=PaginatedDocuments, dependencies=[Depends(require_viewer)]
+)
 async def list_documents(
     page: int = 1,
     page_size: int = 20,
@@ -121,14 +136,18 @@ async def list_documents(
     return PaginatedDocuments(total=total, page=page, page_size=page_size, items=docs)
 
 
-@router.delete("/{document_id}", status_code=status.HTTP_204_NO_CONTENT,
-               dependencies=[Depends(require_uploader)])
+@router.delete(
+    "/{document_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    dependencies=[Depends(require_uploader)],
+)
 async def soft_delete_document(
     document_id: UUID,
     db: AsyncSession = Depends(get_db),
     current_user: dict = Depends(get_current_user),
 ):
     from datetime import datetime, timezone
+
     result = await db.execute(
         select(Document).where(Document.id == document_id, Document.deleted_at == None)
     )
@@ -136,9 +155,16 @@ async def soft_delete_document(
     if not doc:
         raise HTTPException(status_code=404, detail="Document not found")
 
-    if str(doc.uploaded_by) != current_user["sub"] and current_user.get("role") != "admin":
-        raise HTTPException(status_code=403, detail="Cannot delete another user's document")
+    if (
+        str(doc.uploaded_by) != current_user["sub"]
+        and current_user.get("role") != "admin"
+    ):
+        raise HTTPException(
+            status_code=403, detail="Cannot delete another user's document"
+        )
 
     doc.deleted_at = datetime.now(timezone.utc)
     await db.commit()
-    log.info("document_soft_deleted", document_id=str(document_id), user=current_user["sub"])
+    log.info(
+        "document_soft_deleted", document_id=str(document_id), user=current_user["sub"]
+    )

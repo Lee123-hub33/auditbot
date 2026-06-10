@@ -7,9 +7,12 @@ from passlib.context import CryptContext
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
+
 async def seed():
     async with AsyncSessionLocal() as db:
-        result = await db.execute(select(User).where(User.email == "admin@auditbot.com"))
+        result = await db.execute(
+            select(User).where(User.email == "admin@auditbot.com")
+        )
         user = result.scalar_one_or_none()
 
         if not user:
@@ -27,5 +30,6 @@ async def seed():
             user.role = UserRole.ADMIN
             await db.commit()
             print("✓ Existing user promoted to admin")
+
 
 asyncio.run(seed())
