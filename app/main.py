@@ -1,4 +1,3 @@
-# app/main.py
 import logging
 import structlog
 from fastapi import FastAPI, Request
@@ -9,10 +8,11 @@ from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
 
+# Importing settings and routers
 from app.config import settings
 from app.middleware.logging import RequestLoggingMiddleware
 from app.middleware.security_headers import SecurityHeadersMiddleware
-from app.routers import auth, documents, audit
+from app.routers import auth, documents, audit, rules
 
 # ── Structured Logging ────────────────────────────────────────────────────────
 structlog.configure(
@@ -28,15 +28,18 @@ structlog.configure(
 )
 
 # ── Rate Limiter ───────────────────────────────────────────────────────────────
-try:
-    limiter = Limiter(
-        key_func=get_remote_address,
-        storage_uri=settings.REDIS_URL.get_secret_value(),
-        strategy="moving-window",
-    )
-except Exception:
-    # Fallback to in-memory if Redis unavailable
-    limiter = Limiter(key_func=get_remote_address)
+# We use a helper function to initialize to ensure no errors stop app collection
+def create_limiter():
+    try:
+        return Limiter(
+            key_func=get_remote_address,
+            storage_uri=settings.REDIS_URL.get_secret_value(),
+            strategy="moving-window",
+        )
+    except Exception:
+        return Limiter(key_func=get_remote_address)
+
+limiter = create_limiter()
 
 # ── App Factory ────────────────────────────────────────────────────────────────
 app = FastAPI(
@@ -48,7 +51,7 @@ app = FastAPI(
     openapi_url="/openapi.json",
 )
 
-# Rate limiter
+# Rate limiter setup
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 app.add_middleware(SlowAPIMiddleware)
@@ -66,7 +69,6 @@ app.add_middleware(
 app.add_middleware(SecurityHeadersMiddleware)
 app.add_middleware(RequestLoggingMiddleware)
 
-
 # ── Global error handler ───────────────────────────────────────────────────────
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
@@ -74,12 +76,11 @@ async def global_exception_handler(request: Request, exc: Exception):
     log.error("unhandled_exception", path=request.url.path, error=str(exc))
     return JSONResponse(status_code=500, content={"detail": "Internal server error"})
 
-
 # ── Routers ────────────────────────────────────────────────────────────────────
 app.include_router(auth.router)
 app.include_router(documents.router)
 app.include_router(audit.router)
-
+app.include_router(rules.router)
 
 # ── Health Check ───────────────────────────────────────────────────────────────
 @app.get("/health", tags=["Health"])
