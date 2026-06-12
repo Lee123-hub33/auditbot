@@ -1,4 +1,3 @@
-# app/routers/documents.py
 import os
 import secrets
 from pathlib import Path
@@ -14,7 +13,7 @@ from app.schemas import DocumentResponse, DocumentStatusResponse, PaginatedDocum
 from app.auth.rbac import require_uploader, require_viewer
 from app.auth.jwt import get_current_user
 from app.utils.file_validator import validate_and_read_file
-from app.tasks import process_document_pipeline
+from app.tasks import process_document_pipeline, process_document
 from app.config import settings
 from uuid import UUID
 import structlog
@@ -22,7 +21,6 @@ import structlog
 log = structlog.get_logger()
 router = APIRouter(prefix="/api/v1/documents", tags=["Documents"])
 limiter = Limiter(key_func=get_remote_address)
-
 
 @router.post(
     "/upload",
@@ -39,22 +37,15 @@ async def upload_document(
 ):
     content, sha256, mime_type = await validate_and_read_file(file)
 
-    # Check for duplicate
     existing = await db.execute(select(Document).where(Document.sha256 == sha256))
     if existing.scalar_one_or_none():
-        raise HTTPException(
-            status_code=409, detail="Document already uploaded (duplicate detected)"
-        )
+        raise HTTPException(status_code=409, detail="Document already uploaded")
 
-    # Safe storage path
     token = secrets.token_hex(32)
     ext = (file.filename or "file").rsplit(".", 1)[-1].lower()
     secure_name = f"{token}.{ext}"
     base = Path(settings.STORAGE_DIR).resolve()
     target = base / secure_name
-
-    if not str(target.resolve()).startswith(str(base)):
-        raise HTTPException(status_code=400, detail="Invalid file path")
 
     os.makedirs(base, exist_ok=True, mode=0o750)
     target.write_bytes(content)
@@ -74,20 +65,18 @@ async def upload_document(
     await db.commit()
     await db.refresh(db_doc)
 
-    # Queue Celery task
-    process_document_pipeline.apply_async(
-        args=[str(db_doc.id)],
-        countdown=1,
-    )
+    try:
+        await process_document(str(db_doc.id))
+    except Exception as exc:
+        log.error(
+            "document_processing_failed_on_upload",
+            document_id=str(db_doc.id),
+            error=str(exc),
+        )
+    finally:
+        await db.refresh(db_doc)
 
-    log.info(
-        "document_uploaded",
-        document_id=str(db_doc.id),
-        filename=db_doc.filename,
-        user=current_user["sub"],
-    )
     return db_doc
-
 
 @router.get(
     "/{document_id}/status",
@@ -101,8 +90,13 @@ async def get_document_status(document_id: UUID, db: AsyncSession = Depends(get_
     doc = result.scalar_one_or_none()
     if not doc:
         raise HTTPException(status_code=404, detail="Document not found")
-    return doc
-
+    
+    return {
+        "document_id": doc.id,
+        "status": doc.status,
+        "updated_at": doc.updated_at,
+        "error_message": doc.error_message
+    }
 
 @router.get(
     "", response_model=PaginatedDocuments, dependencies=[Depends(require_viewer)]
@@ -116,7 +110,6 @@ async def list_documents(
 ):
     page_size = min(page_size, 100)
     offset = (page - 1) * page_size
-
     query = select(Document).where(Document.deleted_at == None)
 
     if current_user.get("role") != "admin":
@@ -133,8 +126,7 @@ async def list_documents(
     )
     docs = docs_result.scalars().all()
 
-    return PaginatedDocuments(total=total, page=page, page_size=page_size, items=docs)
-
+    return {"total": total, "page": page, "page_size": page_size, "items": docs}
 
 @router.delete(
     "/{document_id}",
@@ -147,7 +139,6 @@ async def soft_delete_document(
     current_user: dict = Depends(get_current_user),
 ):
     from datetime import datetime, timezone
-
     result = await db.execute(
         select(Document).where(Document.id == document_id, Document.deleted_at == None)
     )
@@ -155,16 +146,9 @@ async def soft_delete_document(
     if not doc:
         raise HTTPException(status_code=404, detail="Document not found")
 
-    if (
-        str(doc.uploaded_by) != current_user["sub"]
-        and current_user.get("role") != "admin"
-    ):
-        raise HTTPException(
-            status_code=403, detail="Cannot delete another user's document"
-        )
+    if str(doc.uploaded_by) != current_user["sub"] and current_user.get("role") != "admin":
+        raise HTTPException(status_code=403, detail="Permission denied")
 
     doc.deleted_at = datetime.now(timezone.utc)
     await db.commit()
-    log.info(
-        "document_soft_deleted", document_id=str(document_id), user=current_user["sub"]
-    )
+    return None

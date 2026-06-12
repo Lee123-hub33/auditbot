@@ -1,6 +1,6 @@
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from pydantic import field_validator, SecretStr
-from typing import FrozenSet, List
+from typing import FrozenSet, List, Optional
 from pathlib import Path
 
 # BASE_DIR is outside the class, so Pydantic ignores it as a field
@@ -14,22 +14,29 @@ class Settings(BaseSettings):
         extra="ignore"
     )
 
+    # Core Config
     DATABASE_URL: SecretStr
-    DATABASE_URL_SYNC: SecretStr = None
+    DATABASE_URL_SYNC: Optional[SecretStr] = None
     REDIS_URL: SecretStr
+    SECRET_KEY: SecretStr
+    GEMINI_API_KEY: SecretStr
+    
+    # Environment
+    ENVIRONMENT: str = "development"
+    DEBUG: bool = False
 
+    # Security
     JWT_PRIVATE_KEY_PATH: Path = Path("./secrets/jwt_private.pem")
     JWT_PUBLIC_KEY_PATH: Path = Path("./secrets/jwt_public.pem")
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 15
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
-    SECRET_KEY: SecretStr
 
+    # Storage & File Uploads
     STORAGE_DIR: Path = Path("./storage")
     ALLOWED_EXTENSIONS: FrozenSet[str] = frozenset({"pdf", "txt"})
     MAX_FILE_SIZE_BYTES: int = 15 * 1024 * 1024
-
-    GEMINI_API_KEY: SecretStr
-    ENVIRONMENT: str = "development"
+    
+    # Origins
     ALLOWED_ORIGINS: List[str] = ["http://localhost:3000"]
 
     @field_validator("DATABASE_URL")

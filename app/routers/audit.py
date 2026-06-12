@@ -54,6 +54,15 @@ async def get_audit_report(
     violations = sum(1 for log in logs if log.result == AuditResult.VIOLATION)
     warnings = sum(1 for log in logs if log.result == AuditResult.WARNING)
 
+    local_rule_names = {
+        "PII Detection",
+        "Document Length",
+        "Prohibited Terms",
+        "External URL Count",
+        "Sensitive Keywords",
+    }
+    ai_findings = [entry for entry in logs if entry.rule_checked not in local_rule_names]
+
     return AuditReportResponse(
         document_id=doc.id,
         filename=doc.filename,
@@ -63,6 +72,7 @@ async def get_audit_report(
         violations=violations,
         warnings=warnings,
         logs=logs,
+        ai_findings=ai_findings,
     )
 
 
